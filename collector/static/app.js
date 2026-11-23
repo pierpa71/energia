@@ -774,8 +774,23 @@ function showSettings(s) {
 }
 const settingsBody = () => jsonBody({ ha_url: $('#setHaUrl').value, ha_token: $('#setHaToken').value, reset_token: $('#setTokenReset').checked });
 
+const AUTO_ROLES = [['auto_ricarica', 'Energia ricaricata'], ['auto_km', 'Contachilometri'], ['auto_batteria', 'Livello batteria'],
+  ['auto_potenza', 'Potenza di ricarica'], ['home', 'Presa / wallbox di casa']];
+function renderAutoSensors() {
+  const byCat = Object.fromEntries(Object.entries(META?.sensors || {}).map(([id, m]) => [m.categoria, id]));
+  const src = META?.auto?.source || {};
+  const esc = (t) => String(t).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+  $('#setAuto').innerHTML = '<tbody>' + AUTO_ROLES.map(([k, label]) => {
+    const id = k === 'home' ? META?.auto?.home : byCat[k];
+    const name = id ? (META.sensors[id]?.label || id) : null;
+    const origin = !id ? '' : src[k] === 'env' ? 'da .env' : 'riconosciuto';
+    return `<tr><td>${label}</td><td>${id ? `${esc(name)}<br><code>${esc(id)}</code>` : '<span class="muted">non trovato</span>'}</td><td class="muted">${origin}</td></tr>`;
+  }).join('') + '</tbody>';
+}
+
 async function openSettings() {
   setStatus(''); $('#settingsDlg').showModal();
+  renderAutoSensors();
   try {
     showSettings(await api('/api/settings'));
     const err = META?.sync?.last_error;

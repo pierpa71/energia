@@ -197,3 +197,5 @@ tbody tr:hover td { background: var(--surface-2); }
   .kpi .val { font-size: 22px; }
   .chart, .chart.tall { height: 300px; }
 }
+#setAuto td { text-align: left; vertical-align: top; }
+#setAuto td:first-child { white-space: nowrap; }

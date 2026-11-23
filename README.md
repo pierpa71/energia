@@ -7,7 +7,8 @@ di Home Assistant e le salva in InfluxDB 2.
 
 1. `cp .env.example .env`, poi in HA: *Profilo → Sicurezza → Token di accesso a lunga durata* → crea un token e
    incollalo in `.env` al posto di `INSERISCI_QUI_IL_TOKEN_HA`. Genera `INFLUX_PASSWORD` e `INFLUX_TOKEN`
-   (es. `openssl rand -hex 32`) e, se hai un'auto elettrica, compila le variabili `AUTO_*`.
+   (es. `openssl rand -hex 32`). I sensori di un'auto Tesla sono riconosciuti in automatico; per altre auto
+   compila le variabili `AUTO_*`.
 2. `docker compose up -d`
 3. `podman logs -f energia-collector`: al primo avvio importa tutto lo storico disponibile,
    poi ogni 15 minuti aggiunge le ore nuove.
@@ -27,8 +28,12 @@ profilo orario medio, batteria, mappa oraria, confronto anno su anno, tabella co
 Sezione **Auto** (`http://<raspberry>:8090/#auto`): energia caricata a casa/fuori, quota solare delle
 ricariche di casa, livello batteria, km, consumo medio, orari di ricarica e tabella delle sessioni
 (ricostruite dai dati orari: ore consecutive con ricarica, separate da più di 2 ore di pausa).
-Sensori configurati in `.env` (`AUTO_ENERGY_ID`, `AUTO_ODOMETER_ID`, `AUTO_BATTERY_ID`, `AUTO_POWER_ID`,
-`AUTO_HOME_ID`); i sensori di misura (% batteria, potenza) finiscono nel measurement `misure_orarie`
+I sensori sono **riconosciuti in automatico** a ogni sync: quelli dell'auto dalle integrazioni Tesla Fleet,
+Teslemetry, Tessie (chiavi interne delle entità, indipendenti da nome e lingua) e Tesla Custom (HACS); la presa
+di casa da Tesla Wall Connector o da un dispositivo della dashboard Energia con un nome tipo "auto", "wallbox",
+"ricarica", "charger". Quelli in uso sono elencati in Impostazioni. Le variabili `.env` (`AUTO_ENERGY_ID`,
+`AUTO_ODOMETER_ID`, `AUTO_BATTERY_ID`, `AUTO_POWER_ID`, `AUTO_HOME_ID`), se compilate, hanno la precedenza
+(servono per auto di altre marche). Il riconoscimento richiede un token di un utente HA amministratore. I sensori di misura (% batteria, potenza) finiscono nel measurement `misure_orarie`
 (field `mean`/`min`/`max`). Una sessione è "a casa" se la presa di casa ha erogato almeno il 30%
 dell'energia entrata nell'auto; la quota solare è ripartita ora per ora in proporzione al consumo di casa.
 

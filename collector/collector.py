@@ -9,6 +9,7 @@ quindi rileggere qualche ora già importata non crea duplicati.
 
 import asyncio
 import json
+import re
 import logging
 import os
 import sys
@@ -50,6 +51,27 @@ AUTO_MEAN = {  # misure: % batteria, potenza di ricarica
     "auto_potenza": os.environ.get("AUTO_POWER_ID", ""),
 }
 AUTO_HOME_ID = os.environ.get("AUTO_HOME_ID", "")  # contatore della presa/wallbox di casa
+
+# Riconoscimento automatico (usato per le variabili AUTO_* lasciate vuote).
+# Chiavi interne (translation_key) delle integrazioni Tesla Fleet, Teslemetry e Tessie:
+# non cambiano se l'entità viene rinominata o se HA è in un'altra lingua.
+TESLA_PLATFORMS = ("tesla_fleet", "teslemetry", "tessie", "tesla_custom")
+AUTO_KEYS = {
+    "auto_ricarica": ("charge_state_charge_energy_added",),
+    "auto_km": ("vehicle_state_odometer",),
+    "auto_batteria": ("charge_state_battery_level", "charge_state_usable_battery_level"),
+    "auto_potenza": ("charge_state_charger_power",),
+}
+# tesla_custom (HACS) non ha translation_key: si riconosce dal suffisso dell'entity_id
+AUTO_SUFFIXES = {
+    "auto_ricarica": ("_energy_added", "_charge_energy_added"),
+    "auto_km": ("_odometer",),
+    "auto_batteria": ("_battery", "_battery_level"),
+    "auto_potenza": ("_charger_power",),
+}
+WALL_PLATFORMS = ("tesla_wall_connector",)
+# contatore della presa/wallbox tra i dispositivi della dashboard Energia, riconosciuto dal nome
+HOME_CHARGER_RE = re.compile(r"auto(?!mazion)|\bcar\b|tesla|wallbox|wall.?connector|ricaric|charger|colonnin|\bev\b", re.I)
 
 log = logging.getLogger("energia")
 
@@ -160,9 +182,10 @@ class HAClient:
                 return msg["result"]
 
 
-def sensors_from_energy_prefs(prefs: dict) -> dict[str, dict]:
+def sensors_from_energy_prefs(prefs: dict, auto: dict | None = None) -> dict[str, dict]:
     """Mappa statistic_id -> {categoria, nome} a partire dalla config Energia."""
     out: dict[str, dict] = {}
+    auto = auto or {}
 
     def add(stat_id, categoria, nome=None, kind="sum"):
         if stat_id:
@@ -191,11 +214,69 @@ def sensors_from_energy_prefs(prefs: dict) -> dict[str, dict]:
 
     for stat_id in EXTRA_IDS:
         add(stat_id, "extra")
-    for cat, stat_id in AUTO_SUM.items():
-        add(stat_id, cat)
-    for cat, stat_id in AUTO_MEAN.items():
-        add(stat_id, cat, kind="mean")
+    for cat in AUTO_SUM:
+        add(auto.get(cat), cat)
+    for cat in AUTO_MEAN:
+        add(auto.get(cat), cat, kind="mean")
+    # wallbox riconosciuta ma non presente nella dashboard Energia: va importata comunque
+    add(auto.get("home"), "auto_casa")
     return out
+
+
+async def detect_auto(ha, prefs: dict, states: list) -> dict:
+    """Sensori dell'auto: variabili AUTO_* se impostate, altrimenti riconoscimento automatico.
+
+    Restituisce {categoria: statistic_id, "home": statistic_id, "source": {categoria: "env"|"auto"}}.
+    """
+    env = {**AUTO_SUM, **AUTO_MEAN, "home": AUTO_HOME_ID}
+    found: dict[str, str] = {}
+    if not all(env.values()):
+        try:
+            registry = await ha.call("config/entity_registry/list")
+            with_stats = {x["statistic_id"] for x in await ha.call("recorder/list_statistic_ids")}
+        except Exception as e:  # utente HA senza permessi admin: si usa solo il .env
+            log.warning("Riconoscimento automatico sensori auto non disponibile: %s", e)
+            registry, with_stats = [], set()
+        usable = sorted((e for e in registry if e["entity_id"].startswith("sensor.") and not e.get("disabled_by")
+                         and e["entity_id"] in with_stats), key=lambda e: e["entity_id"])
+
+        cars = [e for e in usable if e.get("platform") in TESLA_PLATFORMS]
+        # più auto: si usa quella del primo contatore di energia ricaricata trovato
+        for cat, keys in AUTO_KEYS.items():
+            match = [e for e in cars if e.get("translation_key") in keys]
+            match.sort(key=lambda e: keys.index(e["translation_key"]))
+            if not match:
+                match = [e for e in cars if e["entity_id"].endswith(AUTO_SUFFIXES[cat])]
+            if match:
+                found[cat] = match[0]["entity_id"]
+        devices = {e["device_id"] for e in cars if e["entity_id"] == found.get("auto_ricarica")}
+        if devices:  # tutti i sensori dalla stessa auto
+            for cat, keys in AUTO_KEYS.items():
+                same = [e for e in cars if e.get("device_id") in devices
+                        and (e.get("translation_key") in keys or e["entity_id"].endswith(AUTO_SUFFIXES[cat]))]
+                if same:
+                    found[cat] = same[0]["entity_id"]
+
+        names = {st["entity_id"]: st.get("attributes", {}).get("friendly_name") or "" for st in states}
+        consumers = [(d.get("stat_consumption"), d.get("name") or "") for d in prefs.get("device_consumption", [])]
+        # 1) Tesla Wall Connector  2) dispositivo della dashboard Energia con nome da presa/wallbox
+        home = next((e["entity_id"] for e in usable if e.get("platform") in WALL_PLATFORMS and (
+            e.get("translation_key") in ("total_energy", "energy") or e["entity_id"].endswith("_energy"))), None)
+        home = home or next((sid for sid, name in consumers if sid and (
+            HOME_CHARGER_RE.search(name) or HOME_CHARGER_RE.search(sid.replace("_", " "))
+            or HOME_CHARGER_RE.search(names.get(sid, "")))), None)
+        if home:
+            found["home"] = home
+
+    auto, source = {}, {}
+    for key, value in env.items():
+        if value:
+            auto[key], source[key] = value, "env"
+        elif found.get(key):
+            auto[key], source[key] = found[key], "auto"
+    if any(v == "auto" for v in source.values()):
+        log.info("Sensori auto riconosciuti: %s", ", ".join(f"{k}={auto[k]}" for k, v in source.items() if v == "auto"))
+    return {**auto, "source": source}
 
 
 def to_datetime(value) -> datetime:
@@ -222,7 +303,7 @@ from(bucket: "{INFLUX_BUCKET}")
     return out
 
 
-def save_meta(prefs: dict, sensors: dict, states: list) -> None:
+def save_meta(prefs: dict, sensors: dict, states: list, auto: dict) -> None:
     """Salva nomi leggibili e prezzo energia per l'interfaccia web."""
     names = {s["entity_id"]: s.get("attributes", {}).get("friendly_name") for s in states}
     price = next((s.get("number_energy_price") for s in prefs.get("energy_sources", [])
@@ -233,7 +314,7 @@ def save_meta(prefs: dict, sensors: dict, states: list) -> None:
             for sid, m in sensors.items()
         },
         "price": price,
-        "auto": {"home": AUTO_HOME_ID or None},
+        "auto": {"home": auto.get("home"), "source": auto.get("source", {})},
     }
     try:
         os.makedirs(os.path.dirname(META_PATH), exist_ok=True)
@@ -291,12 +372,14 @@ async def sync_once(influx: InfluxDBClient) -> int:
 
     async with HAClient(ha_url(), ha_token()) as ha:
         prefs = await ha.call("energy/get_prefs")
-        sensors = sensors_from_energy_prefs(prefs)
+        states = await ha.call("get_states")
+        auto = await detect_auto(ha, prefs, states)
+        sensors = sensors_from_energy_prefs(prefs, auto)
         if not sensors:
             log.warning("Nessun sensore trovato nella dashboard Energia")
             return 0
         log.info("Sensori monitorati: %d", len(sensors))
-        save_meta(prefs, sensors, await ha.call("get_states"))
+        save_meta(prefs, sensors, states, auto)
 
         now = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
         lasts = {} if FORCE_BACKFILL else last_imported(influx.query_api())

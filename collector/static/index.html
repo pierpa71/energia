@@ -156,7 +156,7 @@
 
 <main id="viewAuto" hidden>
   <section class="kpis" id="autoKpis"></section>
-  <p id="autoEmpty" class="empty" hidden>Nessun sensore auto configurato (variabili AUTO_* nel file .env).</p>
+  <p id="autoEmpty" class="empty" hidden>Nessuna auto trovata in Home Assistant. I sensori Tesla (Tesla Fleet, Teslemetry, Tessie) vengono riconosciuti in automatico; per altre auto usa le variabili AUTO_* nel file .env.</p>
   <section class="grid" id="autoGrid">
     <article class="card span-2">
       <header><div><h2>Energia ricaricata</h2><p class="muted">A casa (dalla presa, divisa tra solare/batteria e rete) e fuori casa (energia entrata nell'auto) · kWh</p></div></header>
@@ -243,6 +243,12 @@
       <button type="submit" id="setSave" class="primary"><span>Salva e aggiorna</span></button>
     </div>
   </form>
+
+  <section class="dlg-sec">
+    <h3>Sensori auto</h3>
+    <p class="muted">Riconosciuti in automatico da Home Assistant a ogni sync (Tesla Fleet, Teslemetry, Tessie, Tesla Wall Connector, o un dispositivo della dashboard Energia con un nome tipo "auto", "wallbox", "ricarica"). Le variabili <code>AUTO_*</code> del file <code>.env</code>, se compilate, hanno la precedenza.</p>
+    <div class="table-wrap"><table id="setAuto"></table></div>
+  </section>
   <p id="setStatus" class="bk-status" role="status"></p>
 </dialog>
 
