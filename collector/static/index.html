@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Energia Casa</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%23eda100' d='M13 2 4 14h7l-1 8 9-12h-7z'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>
+    <div>
+      <h1>Energia Casa</h1>
+      <p id="dataInfo" class="muted">Caricamento…</p>
+    </div>
+  </div>
+  <div class="seg view-seg" id="viewSeg" role="tablist" aria-label="Sezione">
+    <button data-view="casa"><svg viewBox="0 0 24 24"><path d="M3 11 12 4l9 7M5 10v10h14V10"/></svg>Casa</button>
+    <button data-view="auto"><svg viewBox="0 0 24 24"><path d="M5 17h14M6 17l1.5-6h9L18 17M4 17v3M20 17v3M8 14h.01M16 14h.01M9 11l1-3h4l1 3"/></svg>Auto</button>
+  </div>
+  <div class="actions">
+    <button id="backupBtn" class="icon-btn" title="Backup e ripristino" aria-label="Backup e ripristino">
+      <svg viewBox="0 0 24 24"><path d="M4 7c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 7v5c0 1.7 3.6 3 8 3s8-1.3 8-3V7M4 12v5c0 1.7 3.6 3 8 3s8-1.3 8-3v-5"/></svg>
+    </button>
+    <button id="themeBtn" class="icon-btn" title="Tema chiaro/scuro" aria-label="Cambia tema">
+      <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg>
+    </button>
+    <button id="syncBtn" class="primary">
+      <svg class="ico" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5"/></svg>
+      <span>Aggiorna da Home Assistant</span>
+    </button>
+  </div>
+</header>
+
+<nav class="filters" aria-label="Periodo">
+  <div class="seg" id="modeSeg" role="tablist">
+    <button data-mode="day">Giorno</button>
+    <button data-mode="week">Settimana</button>
+    <button data-mode="month">Mese</button>
+    <button data-mode="year">Anno</button>
+    <button data-mode="all">Tutto</button>
+    <button data-mode="custom">Personalizzato</button>
+  </div>
+  <div class="period">
+    <button id="prevBtn" class="icon-btn" aria-label="Periodo precedente"><svg viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></svg></button>
+    <div id="periodLabel" class="period-label"></div>
+    <button id="nextBtn" class="icon-btn" aria-label="Periodo successivo"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button>
+    <button id="todayBtn" class="ghost">Oggi</button>
+  </div>
+  <div class="custom" id="customBox" hidden>
+    <input type="date" id="cStart" aria-label="Dal"> <span class="muted">→</span> <input type="date" id="cEnd" aria-label="Al">
+  </div>
+  <label class="gran">Dettaglio
+    <select id="granSel">
+      <option value="auto">Automatico</option>
+      <option value="hour">Ora</option>
+      <option value="day">Giorno</option>
+      <option value="week">Settimana</option>
+      <option value="month">Mese</option>
+      <option value="year">Anno</option>
+    </select>
+  </label>
+  <button id="xlsxBtn" class="ghost xlsx" title="Scarica i dati del periodo selezionato in Excel">
+    <svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 12l4 5M13 12l-4 5"/></svg>
+    <span>Esporta Excel</span>
+  </button>
+</nav>
+
+<main id="viewCasa">
+  <section class="kpis" id="kpis"></section>
+
+  <section class="grid">
+    <article class="card span-2">
+      <header><div><h2>Bilancio energetico</h2><p class="muted">Da dove arriva l'energia consumata (sopra) e dove va il surplus (sotto) · kWh</p></div></header>
+      <div class="chart tall" id="chBalance"></div>
+    </article>
+
+    <article class="card">
+      <header><div><h2>Flussi di energia</h2><p class="muted">Sorgenti → destinazioni nel periodo · kWh</p></div></header>
+      <div class="chart tall" id="chSankey"></div>
+    </article>
+
+    <article class="card">
+      <header><div><h2>Consumi per dispositivo</h2><p class="muted">Quota sul consumo totale della casa</p></div></header>
+      <div class="chart tall" id="chDevices"></div>
+    </article>
+
+    <article class="card span-2">
+      <header><div><h2>Dispositivi nel tempo</h2><p class="muted">Consumo dei dispositivi monitorati · kWh</p></div></header>
+      <div class="chart" id="chDevTime"></div>
+    </article>
+
+    <article class="card">
+      <header><div><h2>Produzione solare</h2><p class="muted">Per sorgente / stringa · kWh</p></div></header>
+      <div class="chart" id="chSolar"></div>
+    </article>
+
+    <article class="card">
+      <header><div><h2>Autosufficienza e autoconsumo</h2><p class="muted">% per intervallo</p></div></header>
+      <div class="chart" id="chRatio"></div>
+    </article>
+
+    <article class="card">
+      <header><div><h2>Profilo orario medio</h2><p class="muted">Media per ora del giorno · kWh</p></div></header>
+      <div class="chart" id="chProfile"></div>
+    </article>
+
+    <article class="card">
+      <header><div><h2>Batteria</h2><p class="muted">Carica (sotto) e scarica (sopra) · kWh</p></div></header>
+      <div class="chart" id="chBattery"></div>
+    </article>
+
+    <article class="card span-2">
+      <header>
+        <div><h2>Mappa oraria</h2><p class="muted">Ogni cella = un'ora · kWh</p></div>
+        <select id="heatSel" class="small">
+          <option value="casa">Consumo casa</option>
+          <option value="solare">Produzione solare</option>
+          <option value="rete_prelievo">Prelievo rete</option>
+          <option value="rete_immissione">Immissione rete</option>
+        </select>
+      </header>
+      <div class="chart" id="chHeat"></div>
+    </article>
+
+    <article class="card span-2">
+      <header>
+        <div><h2>Confronto anno su anno</h2><p class="muted">Totali mensili per anno · kWh (tutto lo storico)</p></div>
+        <select id="yoySel" class="small">
+          <option value="casa">Consumo casa</option>
+          <option value="solare">Produzione solare</option>
+          <option value="rete_prelievo">Prelievo rete</option>
+          <option value="rete_immissione">Immissione rete</option>
+          <option value="autosuff">Autosufficienza %</option>
+        </select>
+      </header>
+      <div class="chart" id="chYoy"></div>
+    </article>
+
+    <article class="card span-2">
+      <header>
+        <div><h2>Dati</h2><p class="muted">Tabella del periodo selezionato · kWh</p></div>
+        <button id="csvBtn" class="ghost">Esporta CSV</button>
+      </header>
+      <div class="table-wrap"><table id="dataTable"></table></div>
+    </article>
+  </section>
+</main>
+
+<main id="viewAuto" hidden>
+  <section class="kpis" id="autoKpis"></section>
+  <p id="autoEmpty" class="empty" hidden>Nessun sensore auto configurato (variabili AUTO_* nel file .env).</p>
+  <section class="grid" id="autoGrid">
+    <article class="card span-2">
+      <header><div><h2>Energia ricaricata</h2><p class="muted">A casa (dalla presa, divisa tra solare/batteria e rete) e fuori casa (energia entrata nell'auto) · kWh</p></div></header>
+      <div class="chart tall" id="chAutoEnergy"></div>
+    </article>
+    <article class="card span-2">
+      <header><div><h2>Livello batteria auto</h2><p class="muted">Media con intervallo min–max · %</p></div></header>
+      <div class="chart" id="chAutoBattery"></div>
+    </article>
+    <article class="card">
+      <header><div><h2>Origine dell'energia</h2><p class="muted">Ripartizione delle ricariche nel periodo · kWh</p></div></header>
+      <div class="chart" id="chAutoMix"></div>
+    </article>
+    <article class="card">
+      <header><div><h2>Km percorsi</h2><p class="muted">Dal contachilometri · km</p></div></header>
+      <div class="chart" id="chAutoKm"></div>
+    </article>
+    <article class="card span-2">
+      <header><div><h2>Orario delle ricariche</h2><p class="muted">Energia caricata per ora del giorno · kWh</p></div></header>
+      <div class="chart" id="chAutoHours"></div>
+    </article>
+    <article class="card span-2">
+      <header>
+        <div><h2>Sessioni di ricarica</h2><p class="muted">Ricostruite dai dati orari · la più recente in alto</p></div>
+        <button id="sessCsvBtn" class="ghost">Esporta CSV</button>
+      </header>
+      <div class="table-wrap"><table id="sessTable"></table></div>
+    </article>
+  </section>
+</main>
+
+<dialog id="backupDlg" class="dlg" aria-labelledby="bkTitle">
+  <header class="dlg-head">
+    <h2 id="bkTitle">Backup e ripristino</h2>
+    <button class="icon-btn" id="bkClose" aria-label="Chiudi"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  </header>
+
+  <section class="dlg-sec">
+    <h3>Crea un backup</h3>
+    <p class="muted">Archivio <code>.tar.gz</code> con tutti i dati (casa e auto) e i nomi dei sensori. Viene scaricato e conservato anche sul server (ultimi 10).</p>
+    <button id="bkCreate" class="primary"><svg class="ico" viewBox="0 0 24 24"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg><span>Crea e scarica backup</span></button>
+  </section>
+
+  <section class="dlg-sec">
+    <h3>Ripristina da file</h3>
+    <p class="muted"><b>Ripristino completo:</b> tutti i dati attuali vengono sostituiti da quelli del file. Prima viene creato in automatico un backup di sicurezza dello stato attuale.</p>
+    <div class="file-row">
+      <input type="file" id="bkFile" accept=".gz,.tgz,application/gzip">
+      <button id="bkRestoreFile" class="danger" disabled>Ripristina</button>
+    </div>
+  </section>
+
+  <section class="dlg-sec">
+    <h3>Backup sul server</h3>
+    <div class="table-wrap"><table id="bkTable"></table></div>
+  </section>
+  <p id="bkStatus" class="bk-status" role="status"></p>
+</dialog>
+
+<div id="toast" class="toast" role="status" hidden></div>
+<script src="/static/vendor/echarts.min.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

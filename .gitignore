@@ -1,0 +1,9 @@
+# segreti: token Home Assistant e InfluxDB
+.env
+
+# dati locali: database InfluxDB, metadati, backup
+data/
+
+# python
+__pycache__/
+*.pyc
