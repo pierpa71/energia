@@ -9,7 +9,7 @@ di Home Assistant e le salva in InfluxDB 2.
    incollalo in `.env` al posto di `INSERISCI_QUI_IL_TOKEN_HA`. Genera `INFLUX_PASSWORD` e `INFLUX_TOKEN`
    (es. `openssl rand -hex 32`) e, se hai un'auto elettrica, compila le variabili `AUTO_*`.
 2. `docker compose up -d`
-3. `docker logs -f energia-collector`: al primo avvio importa tutto lo storico disponibile,
+3. `podman logs -f energia-collector`: al primo avvio importa tutto lo storico disponibile,
    poi ogni 15 minuti aggiunge le ore nuove.
 
 - **Dashboard**: http://<raspberry>:8090 (pulsante "Aggiorna da Home Assistant" per un sync immediato)

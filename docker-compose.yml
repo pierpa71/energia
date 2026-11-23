@@ -1,6 +1,6 @@
 services:
   influxdb:
-    image: influxdb:2.7
+    image: docker.io/library/influxdb:2.7
     container_name: influxdb-energia
     restart: unless-stopped
     ports:
@@ -20,10 +20,17 @@ services:
     build: ./collector
     container_name: energia-collector
     restart: unless-stopped
-    network_mode: host   # raggiunge HA (rete host) e InfluxDB su 127.0.0.1
     depends_on:
       - influxdb
     env_file: .env
+    environment:
+      # in rete bridge 127.0.0.1 è il container stesso: InfluxDB si raggiunge per nome
+      # del servizio, Home Assistant (rete host) tramite host.containers.internal,
+      # che Podman aggiunge da solo in /etc/hosts
+      INFLUX_URL: http://influxdb:8086
+      HA_URL: http://host.containers.internal:8123
+      WEB_PORT: "8090"   # porta interna fissa; quella pubblicata si cambia con WEB_PORT nel .env
+    ports:
+      - "${WEB_PORT:-8090}:8090"   # interfaccia web su http://<host>:8090
     volumes:
       - ./data/app:/data   # metadati sensori (nomi, prezzo)
-    # interfaccia web su http://<host>:8090 (WEB_PORT nel .env per cambiarla)
