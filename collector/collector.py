@@ -14,6 +14,8 @@ import os
 import sys
 from datetime import datetime, timedelta, timezone
 
+from urllib.parse import urlsplit
+
 import websockets
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
@@ -35,6 +37,7 @@ INTERVAL_SECONDS = int(os.environ.get("INTERVAL_SECONDS", "900"))
 RUN_ONCE = os.environ.get("RUN_ONCE", "false").lower() == "true"
 # statistic_id extra non presenti nella dashboard Energia, separati da virgola
 META_PATH = os.environ.get("META_PATH", "/data/meta.json")
+SETTINGS_PATH = os.environ.get("SETTINGS_PATH", os.path.join(os.path.dirname(META_PATH), "settings.json"))
 EXTRA_IDS = [s.strip() for s in os.environ.get("EXTRA_STATISTIC_IDS", "").split(",") if s.strip()]
 
 # Auto elettrica: sensori opzionali (lasciare vuoto per disattivare)
@@ -50,6 +53,56 @@ AUTO_HOME_ID = os.environ.get("AUTO_HOME_ID", "")  # contatore della presa/wallb
 
 log = logging.getLogger("energia")
 
+HA_DEFAULT_PORT = 8123
+
+
+def load_settings() -> dict:
+    """Impostazioni modificabili dall'interfaccia web (hanno la precedenza sul .env)."""
+    try:
+        with open(SETTINGS_PATH) as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_settings(settings: dict) -> None:
+    os.makedirs(os.path.dirname(SETTINGS_PATH), exist_ok=True)
+    tmp = SETTINGS_PATH + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(settings, f, ensure_ascii=False, indent=1)
+    os.replace(tmp, SETTINGS_PATH)
+
+
+def ha_url() -> str:
+    """URL di Home Assistant in uso: quello impostato dall'interfaccia, altrimenti HA_URL."""
+    return (load_settings().get("ha_url") or HA_URL).rstrip("/")
+
+
+def normalize_ha_url(value: str) -> str:
+    """Accetta IP, hostname, host:porta o URL completo e restituisce http(s)://host:porta.
+
+    Senza schema si assume http e, se manca la porta, quella standard di HA (8123).
+    Stringa vuota = torna al valore predefinito. Solleva ValueError se non valido.
+    """
+    value = (value or "").strip()
+    if not value:
+        return ""
+    has_scheme = "://" in value
+    p = urlsplit(value if has_scheme else "http://" + value)
+    if p.scheme not in ("http", "https"):
+        raise ValueError("Lo schema deve essere http o https")
+    if not p.hostname or p.username or p.password or p.query or p.fragment or p.path not in ("", "/"):
+        raise ValueError("Indica solo IP o hostname, con porta facoltativa (es. 192.168.1.50:8123)")
+    try:
+        port = p.port
+    except ValueError:
+        raise ValueError("Porta non valida") from None
+    netloc = p.netloc
+    if port is None and not has_scheme:
+        netloc += f":{HA_DEFAULT_PORT}"
+    return f"{p.scheme}://{netloc}"
+
 
 class HAClient:
     """Client minimale per l'API WebSocket di Home Assistant."""
@@ -59,6 +112,7 @@ class HAClient:
         self.token = token
         self._id = 0
         self.ws = None
+        self.version = None
 
     async def __aenter__(self):
         self.ws = await websockets.connect(self.ws_url, max_size=None, open_timeout=30)
@@ -69,7 +123,8 @@ class HAClient:
         msg = json.loads(await self.ws.recv())
         if msg.get("type") != "auth_ok":
             raise RuntimeError(f"Autenticazione HA fallita: {msg.get('message', msg)}")
-        log.info("Connesso a Home Assistant %s", msg.get("ha_version"))
+        self.version = msg.get("ha_version")
+        log.info("Connesso a Home Assistant %s su %s", self.version, self.ws_url)
         return self
 
     async def __aexit__(self, *exc):
@@ -215,7 +270,7 @@ async def fetch_and_write(ha, write_api, sensors: dict, ids: list[str], start: d
 async def sync_once(influx: InfluxDBClient) -> int:
     write_api = influx.write_api(write_options=SYNCHRONOUS)
 
-    async with HAClient(HA_URL, HA_TOKEN) as ha:
+    async with HAClient(ha_url(), HA_TOKEN) as ha:
         prefs = await ha.call("energy/get_prefs")
         sensors = sensors_from_energy_prefs(prefs)
         if not sensors:

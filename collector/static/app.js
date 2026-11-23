@@ -758,6 +758,48 @@ async function restore(savedName) {
   finally { bkBusy(false); }
 }
 
+// ------------------------------------------------------------------ impostazioni
+function setStatus(msg, kind = '') { const el = $('#setStatus'); el.textContent = msg; el.className = `bk-status ${kind}`; }
+function setBusy(on) { ['#setTest', '#setSave', '#setHaUrl'].forEach((sel) => { $(sel).disabled = on; }); }
+function showSettings(s) {
+  $('#setHaUrl').value = s.ha_url_custom;
+  $('#setDefault').textContent = s.ha_url_default;
+  $('#setCurrent').textContent = s.ha_url;
+}
+
+async function openSettings() {
+  setStatus(''); $('#settingsDlg').showModal();
+  try {
+    showSettings(await api('/api/settings'));
+    const err = META?.sync?.last_error;
+    if (err) setStatus(`Ultimo sync fallito: ${err}`, 'error');
+  } catch (e) { setStatus(`Errore: ${e.message}`, 'error'); }
+}
+
+const jsonBody = (obj) => ({ headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(obj) });
+
+async function testSettings() {
+  setBusy(true); setStatus('Connessione in corso…');
+  try {
+    const r = await api('/api/settings/test', { method: 'POST', ...jsonBody({ ha_url: $('#setHaUrl').value }) });
+    setStatus(`Connessione riuscita: Home Assistant ${r.version || ''} su ${r.ha_url}`, 'ok');
+  } catch (e) { setStatus(e.message, 'error'); }
+  finally { setBusy(false); }
+}
+
+async function saveSettings(ev) {
+  ev.preventDefault();
+  setBusy(true); setStatus('Salvataggio…');
+  try {
+    const s = await api('/api/settings', { method: 'PUT', ...jsonBody({ ha_url: $('#setHaUrl').value }) });
+    showSettings(s);
+    setStatus(`Salvato: i dati verranno letti da ${s.ha_url}`, 'ok');
+    $('#settingsDlg').close();
+    doSync();
+  } catch (e) { setStatus(e.message, 'error'); }
+  finally { setBusy(false); }
+}
+
 // ------------------------------------------------------------------ IO
 async function api(path, opts) {
   const r = await fetch(path, opts);
@@ -873,6 +915,10 @@ function init() {
     bkStatus(''); $('#backupDlg').showModal();
     loadBackups().catch((e) => bkStatus(`Errore: ${e.message}`, 'error'));
   });
+  $('#settingsBtn').addEventListener('click', openSettings);
+  $('#setClose').addEventListener('click', () => $('#settingsDlg').close());
+  $('#setTest').addEventListener('click', testSettings);
+  $('#setForm').addEventListener('submit', saveSettings);
   $('#bkClose').addEventListener('click', () => $('#backupDlg').close());
   $('#bkCreate').addEventListener('click', createBackup);
   $('#bkFile').addEventListener('change', () => { $('#bkRestoreFile').disabled = !$('#bkFile').files.length; });

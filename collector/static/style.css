@@ -159,6 +159,8 @@ tbody tr:hover td { background: var(--surface-2); }
 .danger { background: #d03b3b; color: #fff; border-color: transparent; font-weight: 600; }
 .danger:hover { border-color: transparent; filter: brightness(1.08); }
 .danger[disabled], .ghost[disabled] { opacity: .5; cursor: not-allowed; filter: none; }
+.text-in { flex: 1; min-width: 200px; cursor: text; }
+.set-current { margin: 8px 0 12px; }
 .bk-status { margin: 8px 20px 18px; min-height: 20px; font-size: 13px; color: var(--text-2); }
 .bk-status.error { color: var(--bad); font-weight: 500; }
 .bk-status.ok { color: var(--good); font-weight: 500; }

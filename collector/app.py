@@ -14,6 +14,7 @@ import tempfile
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 from influxdb_client import Dialect, InfluxDBClient
 
 import collector as c
@@ -217,6 +218,62 @@ async def api_sync():
     except Exception as e:
         raise HTTPException(502, f"Sync fallito: {e}")
     return sync_state
+
+
+# ---------------------------------------------------------------- impostazioni
+
+class SettingsIn(BaseModel):
+    ha_url: str = ""
+
+
+def settings_out() -> dict:
+    custom = c.load_settings().get("ha_url") or ""
+    return {"ha_url": c.ha_url(), "ha_url_custom": custom, "ha_url_default": c.HA_URL}
+
+
+def checked_url(value: str) -> str:
+    try:
+        return c.normalize_ha_url(value)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/settings")
+def api_settings():
+    return settings_out()
+
+
+@app.put("/api/settings")
+def api_settings_save(body: SettingsIn):
+    url = checked_url(body.ha_url)
+    settings = c.load_settings()
+    if url:
+        settings["ha_url"] = url
+    else:
+        settings.pop("ha_url", None)
+    try:
+        c.save_settings(settings)
+    except OSError as e:
+        raise HTTPException(500, f"Impossibile salvare le impostazioni: {e}")
+    log.info("Server Home Assistant impostato a %s", c.ha_url())
+    return settings_out()
+
+
+@app.post("/api/settings/test")
+async def api_settings_test(body: SettingsIn):
+    """Prova connessione e autenticazione verso un server HA senza salvarlo."""
+    url = checked_url(body.ha_url) or c.HA_URL
+    try:
+        async with asyncio.timeout(10):
+            async with c.HAClient(url, c.HA_TOKEN) as ha:
+                version = ha.version
+    except TimeoutError:
+        raise HTTPException(502, f"{url}: nessuna risposta entro 10 secondi")
+    except OSError as e:
+        raise HTTPException(502, f"{url}: impossibile connettersi ({e.strerror or e})")
+    except Exception as e:
+        raise HTTPException(502, f"{url}: {e}")
+    return {"ha_url": url, "version": version}
 
 
 @app.get("/api/data")

@@ -23,6 +23,9 @@
     <button data-view="auto"><svg viewBox="0 0 24 24"><path d="M5 17h14M6 17l1.5-6h9L18 17M4 17v3M20 17v3M8 14h.01M16 14h.01M9 11l1-3h4l1 3"/></svg>Auto</button>
   </div>
   <div class="actions">
+    <button id="settingsBtn" class="icon-btn" title="Impostazioni" aria-label="Impostazioni">
+      <svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
     <button id="backupBtn" class="icon-btn" title="Backup e ripristino" aria-label="Backup e ripristino">
       <svg viewBox="0 0 24 24"><path d="M4 7c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 7v5c0 1.7 3.6 3 8 3s8-1.3 8-3V7M4 12v5c0 1.7 3.6 3 8 3s8-1.3 8-3v-5"/></svg>
     </button>
@@ -211,6 +214,27 @@
     <div class="table-wrap"><table id="bkTable"></table></div>
   </section>
   <p id="bkStatus" class="bk-status" role="status"></p>
+</dialog>
+
+<dialog id="settingsDlg" class="dlg" aria-labelledby="setTitle">
+  <header class="dlg-head">
+    <h2 id="setTitle">Impostazioni</h2>
+    <button class="icon-btn" id="setClose" aria-label="Chiudi"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  </header>
+
+  <form class="dlg-sec" id="setForm">
+    <h3><label for="setHaUrl">Server Home Assistant</label></h3>
+    <p class="muted">IP o hostname da cui leggere i dati, con porta facoltativa (predefinita 8123). Esempi: <code>192.168.1.50</code>, <code>homeassistant.local:8123</code>, <code>https://ha.example.com</code>. Lascia vuoto per usare il valore del file <code>.env</code>: <code id="setDefault"></code></p>
+    <div class="file-row">
+      <input type="text" id="setHaUrl" class="text-in" autocomplete="off" spellcheck="false" placeholder="192.168.1.50">
+    </div>
+    <p class="muted set-current">In uso ora: <code id="setCurrent">–</code></p>
+    <div class="file-row">
+      <button type="button" id="setTest" class="ghost">Prova connessione</button>
+      <button type="submit" id="setSave" class="primary"><span>Salva e aggiorna</span></button>
+    </div>
+  </form>
+  <p id="setStatus" class="bk-status" role="status"></p>
 </dialog>
 
 <div id="toast" class="toast" role="status" hidden></div>

@@ -13,6 +13,7 @@ di Home Assistant e le salva in InfluxDB 2.
    poi ogni 15 minuti aggiunge le ore nuove.
 
 - **Dashboard**: http://<raspberry>:8090 (pulsante "Aggiorna da Home Assistant" per un sync immediato)
+- **Impostazioni** (icona ingranaggio): IP/hostname del server Home Assistant da cui leggere i dati, con prova di connessione. Il valore è salvato in `data/app/settings.json` e ha la precedenza su `HA_URL`; lasciandolo vuoto si torna a `HA_URL`.
 - InfluxDB UI: http://<raspberry>:8086 (utente `admin`, password in `.env`).
 
 ## Dashboard
