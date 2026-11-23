@@ -615,9 +615,27 @@ async def api_restore_saved(name: str):
     return await do_restore(path, protect=name)
 
 
+def asset_version() -> str:
+    """Cambia a ogni modifica dei file statici: forza il browser a ricaricare JS e CSS."""
+    return str(int(max(os.path.getmtime(os.path.join(STATIC, f)) for f in ("app.js", "style.css", "index.html"))))
+
+
 @app.get("/")
 def index():
-    return FileResponse(os.path.join(STATIC, "index.html"), headers={"Cache-Control": "no-cache"})
+    with open(os.path.join(STATIC, "index.html"), encoding="utf-8") as f:
+        html = f.read()
+    v = asset_version()
+    for asset in ("/static/app.js", "/static/style.css"):
+        html = html.replace(f'"{asset}"', f'"{asset}?v={v}"')
+    return Response(html, media_type="text/html", headers={"Cache-Control": "no-cache"})
+
+
+@app.middleware("http")
+async def revalidate_static(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/static/"):
+        response.headers.setdefault("Cache-Control", "no-cache")  # riconvalida con ETag, niente cache "a sentimento"
+    return response
 
 
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
