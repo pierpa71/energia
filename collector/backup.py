@@ -174,14 +174,25 @@ class Backup:
                 raise ValueError(f"File dati mancante o non valido: data/{meas}.lp")
         return manifest
 
-    def restore(self, path: str) -> dict:
-        manifest = self.validate(path)
-        # cancella tutti i dati delle measurement gestite (restore completo)
+    def _delete_all(self) -> None:
+        """Cancella tutti i punti delle measurement gestite."""
         delete_api = self.influx.delete_api()
         stop = datetime.now(timezone.utc) + timedelta(days=366)
         for meas in self.measurements:
             delete_api.delete(datetime(1970, 1, 1, tzinfo=timezone.utc), stop,
                               f'_measurement="{meas}"', bucket=self.bucket, org=self.org)
+
+    def wipe(self) -> None:
+        """Cancellazione completa: dati in InfluxDB e metadati dei sensori (non backup e impostazioni)."""
+        self._delete_all()
+        try:
+            os.remove(self.meta_path)
+        except FileNotFoundError:
+            pass
+
+    def restore(self, path: str) -> dict:
+        manifest = self.validate(path)
+        self._delete_all()  # restore completo
         write_api = self.influx.write_api(write_options=SYNCHRONOUS)
         written = {}
         with tarfile.open(path, "r:gz") as tar:

@@ -213,7 +213,29 @@
     <h3>Backup sul server</h3>
     <div class="table-wrap"><table id="bkTable"></table></div>
   </section>
+
+  <section class="dlg-sec danger-zone">
+    <h3>Cancella tutti i dati</h3>
+    <p class="muted">Elimina tutti i dati importati (casa e auto) e i nomi dei sensori. Restano i backup sul server e le impostazioni. Prima viene creato in automatico un backup di sicurezza.</p>
+    <button id="wipeBtn" class="danger">Cancella tutti i dati…</button>
+  </section>
   <p id="bkStatus" class="bk-status" role="status"></p>
+</dialog>
+
+<dialog id="wipeDlg" class="dlg dlg-sm" aria-labelledby="wipeTitle">
+  <form method="dialog" id="wipeForm">
+    <header class="dlg-head"><h2 id="wipeTitle">Cancellare tutti i dati?</h2></header>
+    <section class="dlg-sec">
+      <p>Verranno eliminati <b>tutti</b> i dati di energia della casa e dell'auto e i nomi dei sensori. L'operazione non si può annullare dall'interfaccia: resta solo il backup di sicurezza creato prima della cancellazione.</p>
+      <p class="muted">Nota: al prossimo sync con Home Assistant (automatico ogni <span id="wipeEvery">15</span> minuti) lo storico ancora disponibile in Home Assistant verrà importato di nuovo.</p>
+      <p><label for="wipeWord">Per confermare scrivi <b>CANCELLA</b>:</label></p>
+      <div class="file-row"><input type="text" id="wipeWord" class="text-in" autocomplete="off" spellcheck="false"></div>
+    </section>
+    <div class="dlg-foot">
+      <button value="cancel" formnovalidate class="ghost" id="wipeCancel">Annulla</button>
+      <button value="ok" id="wipeOk" class="danger" disabled>Cancella definitivamente</button>
+    </div>
+  </form>
 </dialog>
 
 <dialog id="settingsDlg" class="dlg" aria-labelledby="setTitle">

@@ -97,3 +97,8 @@ curl -O http://localhost:8090/api/backups/<nome>.tar.gz                         
 curl -X POST -H 'Content-Type: application/gzip' --data-binary @<file>.tar.gz \
      http://localhost:8090/api/restore                                          # ripristino completo
 ```
+
+**Cancellazione completa** (Backup e ripristino → "Cancella tutti i dati", con conferma scrivendo `CANCELLA`,
+oppure `curl -X POST http://localhost:8090/api/wipe`): elimina tutti i dati in InfluxDB e i nomi dei sensori
+dopo aver creato un backup di sicurezza `pre-wipe_*.tar.gz`; backup e impostazioni restano. Al sync successivo
+viene reimportato lo storico ancora disponibile in Home Assistant.

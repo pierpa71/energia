@@ -208,7 +208,7 @@ def api_meta():
         m["total_kwh"] = alltime.get(sid, 0.0)
     to_iso = lambda t: t.astimezone(TZ).isoformat() if t else None
     return {**meta, "first": to_iso(min(firsts, default=None)), "last": to_iso(max(lasts, default=None)),
-            "sync": sync_state, "tz": TZ_NAME}
+            "sync": sync_state, "sync_interval_min": round(c.INTERVAL_SECONDS / 60), "tz": TZ_NAME}
 
 
 @app.post("/api/sync")
@@ -603,6 +603,27 @@ async def do_restore(path: str, protect: str | None = None) -> dict:
             _cache.clear()
     log.info("Restore completato: %d punti (backup di sicurezza %s)", result["points"], safety["name"])
     return {**result, "safety_backup": safety["name"]}
+
+
+@app.post("/api/wipe")
+async def api_wipe():
+    """Cancella tutti i dati, dopo un backup di sicurezza. Backup e impostazioni restano."""
+    async with sync_lock:
+        try:
+            safety = await asyncio.to_thread(BACKUP.create, "pre-wipe")
+        except Exception as e:
+            log.exception("Backup di sicurezza fallito")
+            raise HTTPException(500, f"Backup di sicurezza fallito, nessun dato cancellato: {e}")
+        try:
+            await asyncio.to_thread(BACKUP.wipe)
+        except Exception as e:
+            log.exception("Cancellazione fallita")
+            raise HTTPException(500, f"Cancellazione fallita: {e}. Stato precedente salvato in {safety['name']}")
+        finally:
+            _cache.clear()
+        sync_state.update(last_sync=None, last_points=None, last_error=None)
+    log.warning("Dati cancellati dall'interfaccia (backup di sicurezza %s)", safety["name"])
+    return {"safety_backup": safety["name"], "next_sync_minutes": round(c.INTERVAL_SECONDS / 60)}
 
 
 @app.post("/api/restore")

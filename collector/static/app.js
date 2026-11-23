@@ -758,6 +758,27 @@ async function restore(savedName) {
   finally { bkBusy(false); }
 }
 
+// ------------------------------------------------------------------ cancellazione dati
+function askWipe() {
+  const dlg = $('#wipeDlg');
+  $('#wipeWord').value = ''; $('#wipeOk').disabled = true;
+  if (META?.sync_interval_min) $('#wipeEvery').textContent = META.sync_interval_min;
+  dlg.returnValue = '';
+  dlg.showModal(); $('#wipeWord').focus();
+}
+
+async function wipeData() {
+  bkBusy(true); $('#wipeBtn').disabled = true;
+  bkStatus('Backup di sicurezza e cancellazione in corso… non chiudere la pagina');
+  try {
+    const r = await api('/api/wipe', { method: 'POST' });
+    bkStatus(`Tutti i dati sono stati cancellati. Backup di sicurezza: ${r.safety_backup}`, 'ok');
+    await loadBackups();
+    await loadMeta(); await Promise.all([load(), loadMonthly()]);
+  } catch (e) { bkStatus(`Errore: ${e.message}`, 'error'); }
+  finally { bkBusy(false); $('#wipeBtn').disabled = false; }
+}
+
 // ------------------------------------------------------------------ impostazioni
 function setStatus(msg, kind = '') { const el = $('#setStatus'); el.textContent = msg; el.className = `bk-status ${kind}`; }
 function setBusy(on) { ['#setTest', '#setSave', '#setHaUrl', '#setHaToken', '#setTokenReset'].forEach((sel) => { $(sel).disabled = on; }); }
@@ -953,6 +974,14 @@ function init() {
   $('#bkCreate').addEventListener('click', createBackup);
   $('#bkFile').addEventListener('change', () => { $('#bkRestoreFile').disabled = !$('#bkFile').files.length; });
   $('#bkRestoreFile').addEventListener('click', () => restore(null));
+  $('#wipeBtn').addEventListener('click', askWipe);
+  $('#wipeWord').addEventListener('keydown', (e) => {  // Invio conferma solo se la parola è giusta
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    if (!$('#wipeOk').disabled) $('#wipeOk').click();
+  });
+  $('#wipeWord').addEventListener('input', () => { $('#wipeOk').disabled = $('#wipeWord').value.trim().toUpperCase() !== 'CANCELLA'; });
+  $('#wipeDlg').addEventListener('close', () => { if ($('#wipeDlg').returnValue === 'ok') wipeData(); });
   $('#themeBtn').addEventListener('click', () => {
     const next = themeMode() === 'dark' ? 'light' : 'dark';
     document.documentElement.dataset.theme = next; store.set('theme', next); renderAll(); renderAuto();

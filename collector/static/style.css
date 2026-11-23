@@ -164,6 +164,11 @@ tbody tr:hover td { background: var(--surface-2); }
 .inline-check { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; cursor: pointer; }
 .inline-check input { height: auto; width: auto; }
 .inline-check[hidden] { display: none; }
+.danger-zone { border-top: 1px solid var(--border); margin-top: 14px; padding-top: 16px; padding-bottom: 6px; }
+.danger-zone h3 { color: var(--bad); }
+.dlg-sm { width: min(480px, calc(100% - 32px)); }
+.dlg-sm p { margin: 0 0 10px; font-size: 14px; line-height: 1.5; }
+.dlg-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 6px 20px 18px; }
 .bk-status { margin: 8px 20px 18px; min-height: 20px; font-size: 13px; color: var(--text-2); }
 .bk-status.error { color: var(--bad); font-weight: 500; }
 .bk-status.ok { color: var(--good); font-weight: 500; }
