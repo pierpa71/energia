@@ -229,6 +229,15 @@
       <input type="text" id="setHaUrl" class="text-in" autocomplete="off" spellcheck="false" placeholder="192.168.1.50">
     </div>
     <p class="muted set-current">In uso ora: <code id="setCurrent">–</code></p>
+
+    <h3><label for="setHaToken">Token di accesso</label></h3>
+    <p class="muted">Token "a lunga durata" di Home Assistant: Profilo utente → Sicurezza → Token di accesso a lunga durata. Per sicurezza il token salvato non viene mai mostrato.</p>
+    <div class="file-row">
+      <input type="password" id="setHaToken" class="text-in" autocomplete="new-password" spellcheck="false">
+      <button type="button" id="setTokenShow" class="ghost" aria-pressed="false">Mostra</button>
+    </div>
+    <p class="muted set-current"><span id="setTokenInfo">–</span>
+      <label id="setTokenResetBox" class="inline-check" hidden><input type="checkbox" id="setTokenReset"> torna al token del file <code>.env</code></label></p>
     <div class="file-row">
       <button type="button" id="setTest" class="ghost">Prova connessione</button>
       <button type="submit" id="setSave" class="primary"><span>Salva e aggiorna</span></button>

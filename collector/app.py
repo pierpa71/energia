@@ -224,18 +224,26 @@ async def api_sync():
 
 class SettingsIn(BaseModel):
     ha_url: str = ""
+    ha_token: str = ""          # vuoto = lascia invariato il token salvato
+    reset_token: bool = False   # true = cancella il token salvato e torna a HA_TOKEN
 
 
 def settings_out() -> dict:
-    custom = c.load_settings().get("ha_url") or ""
-    return {"ha_url": c.ha_url(), "ha_url_custom": custom, "ha_url_default": c.HA_URL}
+    """Il token non viene mai restituito: solo se è impostato e da dove arriva."""
+    s = c.load_settings()
+    return {"ha_url": c.ha_url(), "ha_url_custom": s.get("ha_url") or "", "ha_url_default": c.HA_URL,
+            "ha_token_custom": bool(s.get("ha_token")), "ha_token_default": bool(c.HA_TOKEN)}
+
+
+def checked(fn, value: str) -> str:
+    try:
+        return fn(value)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 def checked_url(value: str) -> str:
-    try:
-        return c.normalize_ha_url(value)
-    except ValueError as e:
-        raise HTTPException(400, str(e))
+    return checked(c.normalize_ha_url, value)
 
 
 @app.get("/api/settings")
@@ -246,16 +254,22 @@ def api_settings():
 @app.put("/api/settings")
 def api_settings_save(body: SettingsIn):
     url = checked_url(body.ha_url)
+    token = checked(c.normalize_ha_token, body.ha_token)
     settings = c.load_settings()
     if url:
         settings["ha_url"] = url
     else:
         settings.pop("ha_url", None)
+    if token:
+        settings["ha_token"] = token
+    elif body.reset_token:
+        settings.pop("ha_token", None)
     try:
         c.save_settings(settings)
     except OSError as e:
         raise HTTPException(500, f"Impossibile salvare le impostazioni: {e}")
-    log.info("Server Home Assistant impostato a %s", c.ha_url())
+    log.info("Server Home Assistant impostato a %s (token %s)", c.ha_url(),
+             "da interfaccia" if settings.get("ha_token") else "da HA_TOKEN")
     return settings_out()
 
 
@@ -263,9 +277,14 @@ def api_settings_save(body: SettingsIn):
 async def api_settings_test(body: SettingsIn):
     """Prova connessione e autenticazione verso un server HA senza salvarlo."""
     url = checked_url(body.ha_url) or c.HA_URL
+    token = checked(c.normalize_ha_token, body.ha_token)
+    if not token:
+        token = c.HA_TOKEN if body.reset_token else (c.load_settings().get("ha_token") or c.HA_TOKEN)
+    if not token:
+        raise HTTPException(400, "Nessun token configurato: inseriscine uno")
     try:
         async with asyncio.timeout(10):
-            async with c.HAClient(url, c.HA_TOKEN) as ha:
+            async with c.HAClient(url, token) as ha:
                 version = ha.version
     except TimeoutError:
         raise HTTPException(502, f"{url}: nessuna risposta entro 10 secondi")

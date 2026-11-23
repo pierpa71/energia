@@ -161,6 +161,9 @@ tbody tr:hover td { background: var(--surface-2); }
 .danger[disabled], .ghost[disabled] { opacity: .5; cursor: not-allowed; filter: none; }
 .text-in { flex: 1; min-width: 200px; cursor: text; }
 .set-current { margin: 8px 0 12px; }
+.inline-check { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; cursor: pointer; }
+.inline-check input { height: auto; width: auto; }
+.inline-check[hidden] { display: none; }
 .bk-status { margin: 8px 20px 18px; min-height: 20px; font-size: 13px; color: var(--text-2); }
 .bk-status.error { color: var(--bad); font-weight: 500; }
 .bk-status.ok { color: var(--good); font-weight: 500; }

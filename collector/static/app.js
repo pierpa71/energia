@@ -760,12 +760,19 @@ async function restore(savedName) {
 
 // ------------------------------------------------------------------ impostazioni
 function setStatus(msg, kind = '') { const el = $('#setStatus'); el.textContent = msg; el.className = `bk-status ${kind}`; }
-function setBusy(on) { ['#setTest', '#setSave', '#setHaUrl'].forEach((sel) => { $(sel).disabled = on; }); }
+function setBusy(on) { ['#setTest', '#setSave', '#setHaUrl', '#setHaToken', '#setTokenReset'].forEach((sel) => { $(sel).disabled = on; }); }
 function showSettings(s) {
   $('#setHaUrl').value = s.ha_url_custom;
   $('#setDefault').textContent = s.ha_url_default;
   $('#setCurrent').textContent = s.ha_url;
+  $('#setHaToken').value = '';
+  $('#setTokenReset').checked = false;
+  $('#setTokenResetBox').hidden = !s.ha_token_custom;
+  $('#setTokenInfo').textContent = s.ha_token_custom ? 'In uso ora: token salvato dall\'interfaccia.'
+    : s.ha_token_default ? 'In uso ora: token del file .env (HA_TOKEN).' : 'Nessun token configurato.';
+  $('#setHaToken').placeholder = s.ha_token_custom || s.ha_token_default ? 'Lascia vuoto per non cambiarlo' : 'Incolla qui il token';
 }
+const settingsBody = () => jsonBody({ ha_url: $('#setHaUrl').value, ha_token: $('#setHaToken').value, reset_token: $('#setTokenReset').checked });
 
 async function openSettings() {
   setStatus(''); $('#settingsDlg').showModal();
@@ -781,7 +788,7 @@ const jsonBody = (obj) => ({ headers: { 'Content-Type': 'application/json' }, bo
 async function testSettings() {
   setBusy(true); setStatus('Connessione in corso…');
   try {
-    const r = await api('/api/settings/test', { method: 'POST', ...jsonBody({ ha_url: $('#setHaUrl').value }) });
+    const r = await api('/api/settings/test', { method: 'POST', ...settingsBody() });
     setStatus(`Connessione riuscita: Home Assistant ${r.version || ''} su ${r.ha_url}`, 'ok');
   } catch (e) { setStatus(e.message, 'error'); }
   finally { setBusy(false); }
@@ -791,7 +798,7 @@ async function saveSettings(ev) {
   ev.preventDefault();
   setBusy(true); setStatus('Salvataggio…');
   try {
-    const s = await api('/api/settings', { method: 'PUT', ...jsonBody({ ha_url: $('#setHaUrl').value }) });
+    const s = await api('/api/settings', { method: 'PUT', ...settingsBody() });
     showSettings(s);
     setStatus(`Salvato: i dati verranno letti da ${s.ha_url}`, 'ok');
     $('#settingsDlg').close();
@@ -919,6 +926,14 @@ function init() {
   $('#setClose').addEventListener('click', () => $('#settingsDlg').close());
   $('#setTest').addEventListener('click', testSettings);
   $('#setForm').addEventListener('submit', saveSettings);
+  $('#setTokenShow').addEventListener('click', () => {
+    const inp = $('#setHaToken'), show = inp.type === 'password';
+    inp.type = show ? 'text' : 'password';
+    $('#setTokenShow').textContent = show ? 'Nascondi' : 'Mostra';
+    $('#setTokenShow').setAttribute('aria-pressed', String(show));
+  });
+  $('#setTokenReset').addEventListener('change', () => { if ($('#setTokenReset').checked) $('#setHaToken').value = ''; });
+  $('#setHaToken').addEventListener('input', () => { if ($('#setHaToken').value) $('#setTokenReset').checked = false; });
   $('#bkClose').addEventListener('click', () => $('#backupDlg').close());
   $('#bkCreate').addEventListener('click', createBackup);
   $('#bkFile').addEventListener('change', () => { $('#bkRestoreFile').disabled = !$('#bkFile').files.length; });

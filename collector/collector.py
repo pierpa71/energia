@@ -21,7 +21,7 @@ from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
 
 HA_URL = os.environ.get("HA_URL", "http://127.0.0.1:8123").rstrip("/")
-HA_TOKEN = os.environ["HA_TOKEN"]
+HA_TOKEN = os.environ.get("HA_TOKEN", "").strip()
 INFLUX_URL = os.environ.get("INFLUX_URL", "http://127.0.0.1:8086")
 INFLUX_TOKEN = os.environ["INFLUX_TOKEN"]
 INFLUX_ORG = os.environ.get("INFLUX_ORG", "casa")
@@ -69,14 +69,33 @@ def load_settings() -> dict:
 def save_settings(settings: dict) -> None:
     os.makedirs(os.path.dirname(SETTINGS_PATH), exist_ok=True)
     tmp = SETTINGS_PATH + ".tmp"
-    with open(tmp, "w") as f:
+    # contiene il token di HA: leggibile solo dal proprietario
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
         json.dump(settings, f, ensure_ascii=False, indent=1)
+    os.chmod(tmp, 0o600)
     os.replace(tmp, SETTINGS_PATH)
 
 
 def ha_url() -> str:
     """URL di Home Assistant in uso: quello impostato dall'interfaccia, altrimenti HA_URL."""
     return (load_settings().get("ha_url") or HA_URL).rstrip("/")
+
+
+def ha_token() -> str:
+    """Token di HA in uso: quello impostato dall'interfaccia, altrimenti HA_TOKEN."""
+    token = load_settings().get("ha_token") or HA_TOKEN
+    if not token:
+        raise RuntimeError("Token di Home Assistant non configurato (Impostazioni o HA_TOKEN nel .env)")
+    return token
+
+
+def normalize_ha_token(value: str) -> str:
+    """Token a lunga durata: niente spazi interni, lunghezza ragionevole. Solleva ValueError."""
+    value = (value or "").strip()
+    if any(ch.isspace() for ch in value) or len(value) > 4096:
+        raise ValueError("Token non valido: incolla il token a lunga durata senza spazi")
+    return value
 
 
 def normalize_ha_url(value: str) -> str:
@@ -270,7 +289,7 @@ async def fetch_and_write(ha, write_api, sensors: dict, ids: list[str], start: d
 async def sync_once(influx: InfluxDBClient) -> int:
     write_api = influx.write_api(write_options=SYNCHRONOUS)
 
-    async with HAClient(ha_url(), HA_TOKEN) as ha:
+    async with HAClient(ha_url(), ha_token()) as ha:
         prefs = await ha.call("energy/get_prefs")
         sensors = sensors_from_energy_prefs(prefs)
         if not sensors:
