@@ -44,7 +44,7 @@ jobs:
       - name: Build e push
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ./collector
           # file: ./percorso/Dockerfile   # se il Dockerfile non è nella root
           platforms: linux/amd64,linux/arm64
           push: true
